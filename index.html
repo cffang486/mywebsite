@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>资料管理系统 - 支持新增、编辑、删除和本地图片上传</title>
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  /* 左侧目录 */
+  .sidebar {
+    width: 220px;
+    background: #f4f4f4;
+    border-right: 1px solid #ccc;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  .sidebar-top {
+    padding: 10px;
+    border-bottom: 1px solid #ccc;
+  }
+  #addBtn {
+    display: none;
+    width: 100%;
+    padding: 8px;
+    background: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+  }
+  #addBtn:hover {
+    background: #357abd;
+  }
+  .sidebar .search {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    border: none;
+    border-bottom: 1px solid #ccc;
+    font-size: 14px;
+  }
+  .item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #ddd;
+    color: #0366d6;
+    user-select: none;
+    transition: background-color 0.2s, text-decoration 0.2s;
+  }
+  .item:hover {
+    background-color: #ddd;
+    text-decoration: underline;
+  }
+  .item.active {
+    background-color: #e1ecf4;
+    font-weight: bold;
+  }
+
+  /* 目录右侧整体容器 */
+  .main-content {
+    flex: 1;
+    display: flex;
+    height: 100vh;
+  }
+
+  /* 左侧内容区域 */
+  .content-text {
+    flex-basis: 50%;
+    padding: 20px 30px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    border-right: 1px solid #ccc;
+    background: #fff;
+    color: #333;
+  }
+  .content-text h2 {
+    margin-top: 0;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 0.3em;
+  }
+  .content-text p {
+    line-height: 1.6;
+    white-space: pre-wrap;
+  }
+
+  /* 编辑区输入框 */
+  .content-text textarea,
+  .content-text input[type="text"] {
+    width: 100%;
+    font-family: Consolas, Monaco, 'Courier New', monospace;
+    font-size: 14px;
+    padding: 10px;
+    box-sizing: border-box;
+    margin-top: 8px;
+    margin-bottom: 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    resize: vertical;
+  }
+  .edit-controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+  }
+  .edit-controls button {
+    flex: 1;
+    padding: 8px 20px;
+    font-size: 14px;
+    background-color: #4a90e2;
+    border: none;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  .edit-controls button:hover {
+    background-color: #357abd;
+  }
+  .edit-controls button.delete {
+    background-color: #d9534f;
+  }
+  .edit-controls button.delete:hover {
+    background-color: #c9302c;
+  }
+
+  /* 右侧图片区域 */
+  .content-image {
+    flex-basis: 50%;
+    padding: 20px;
+    box-sizing: border-box;
+    background: #fafafa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  .content-image img {
+    max-width: 100%;
+    max-height: 70vh;
+    border-radius: 8px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    margin-bottom: 10px;
+  }
+
+  /* 登录框，右上角 */
+  #loginBox {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #fffae6;
+    padding: 10px 15px;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(0,0,0,0.1);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #loginBox input[type="password"] {
+    padding: 6px 8px;
+    font-size: 14px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+  }
+  #loginBox button {
+    padding: 6px 14px;
+    font-size: 14px;
+    background-color: #28a745;
+    border: none;
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  #loginBox button:hover {
+    background-color: #218838;
+  }
+
+  /* 新增弹窗遮罩和内容 */
+  #addModal {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.3);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 1100;
+  }
+  #addModal .modal-content {
+    background: white;
+    padding: 20px 25px;
+    border-radius: 8px;
+    width: 400px;
+    max-width: 90vw;
+    box-sizing: border-box;
+  }
+  #addModal label {
+    display: block;
+    margin-top: 12px;
+    font-weight: 600;
+  }
+  #addModal input[type="text"],
+  #addModal textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px;
+    margin-top: 6px;
+    font-size: 14px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font-family: Consolas, Monaco, 'Courier New', monospace;
+    resize: vertical;
+  }
+  #addModal input[type="file"] {
+    margin-top: 6px;
+  }
+  #addModal button {
+    margin-top: 15px;
+    padding: 10px 20px;
+    background: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 15px;
+  }
+  #addModal button:hover {
+    background: #357abd;
+  }
+  #addModal .btn-cancel {
+    background: #aaa;
+    margin-left: 10px;
+  }
+  #addModal .btn-cancel:hover {
+    background: #888;
+  }
+</style>
+</head>
+<body>
+
+<!-- 左侧目录 -->
+<div class="sidebar">
+  <div class="sidebar-top">
+    <button id="addBtn">➕ 添加资料</button>
+  </div>
+  <input id="searchBox" class="search" placeholder="搜索资料..." />
+  <div id="itemList"></div>
+</div>
+
+<!-- 右侧标题+内容 和 图片 -->
+<div class="main-content">
+  <div class="content-text" id="contentText">
+    <h2>欢迎</h2>
+    <p>请从左侧目录选择一项查看详情。</p>
+  </div>
+  <div class="content-image">
+    <img id="contentImage" src="" alt="" />
+  </div>
+</div>
+
+<!-- 登录框 -->
+<div id="loginBox">
+  <input type="password" id="passwordInput" placeholder="请输入密码" />
+  <button id="loginBtn">登录</button>
+</div>
+
+<!-- 添加资料弹窗 -->
+<div id="addModal">
+  <div class="modal-content">
+    <h3>添加新资料</h3>
+    <label for="newTitle">名称</label>
+    <input type="text" id="newTitle" placeholder="请输入名称" />
+    <label for="newContent">内容</label>
+    <textarea id="newContent" rows="5" placeholder="请输入内容"></textarea>
+    <label for="newImageFile">选择图片</label>
+    <input type="file" id="newImageFile" accept="image/*" />
+    <div style="margin-top:12px; text-align:right;">
+      <button id="btnAddSave">保存</button>
+      <button class="btn-cancel" id="btnAddCancel">取消</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const PASSWORD = "123456";
+  let loggedIn = false;
+  let currentIndex = null;
+
+  const dataKey = "myDataWithImages";
+
+  function loadData() {
+    let data = localStorage.getItem(dataKey);
+    if (data) {
+      return JSON.parse(data);
+    } else {
+      return [
+        {
+          title: "示例资料1",
+          content: "这是第一条资料内容，支持多行文本。\n你可以放很详细的介绍。",
+          image: "https://picsum.photos/id/1015/600/400"
+        },
+        {
+          title: "示例资料2",
+          content: "这是第二条资料内容，可以换成你自己的文本。\n支持换行和格式。",
+          image: "https://picsum.photos/id/1016/600/400"
+        },
+        {
+          title: "示例资料3",
+          content: "第三条资料内容，丰富有趣。",
+          image: "https://picsum.photos/id/1018/600/400"
+        }
+      ];
+    }
+  }
+
+  function saveData(data) {
+    localStorage.setItem(dataKey, JSON.stringify(data));
+  }
+
+  const itemList = document.getElementById("itemList");
+  const contentText = document.getElementById("contentText");
+  const contentImage = document.getElementById("contentImage");
+  const searchBox = document.getElementById("searchBox");
+  const loginBox = document.getElementById("loginBox");
+  const passwordInput = document.getElementById("passwordInput");
+  const loginBtn = document.getElementById("loginBtn");
+  const addBtn = document.getElementById("addBtn");
+  const addModal = document.getElementById("addModal");
+  const newTitleInput = document.getElementById("newTitle");
+  const newContentInput = document.getElementById("newContent");
+  const newImageFileInput = document.getElementById("newImageFile");
+  const btnAddSave = document.getElementById("btnAddSave");
+  const btnAddCancel = document.getElementById("btnAddCancel");
+
+  function renderList(filter = "") {
+    itemList.innerHTML = "";
+    const data = loadData();
+    data.forEach((item, index) => {
+      if (item.title.includes(filter) || item.content.includes(filter)) {
+        const div = document.createElement("div");
+        div.className = "item";
+        div.textContent = item.title;
+        div.onclick = () => {
+          selectItem(index, div);
+        };
+        itemList.appendChild(div);
+      }
+    });
+  }
+
+  function showContent(index) {
+    const data = loadData();
+    const item = data[index];
+    contentText.innerHTML = `
+      <h2>${item.title}</h2>
+      <p>${item.content.replace(/\n/g, "<br>")}</p>
+    `;
+    contentImage.src = item.image;
+    contentImage.alt = item.title;
+  }
+
+  function showEdit(index) {
+    const data = loadData();
+    const item = data[index];
+
+    contentText.innerHTML = "";
+
+    const nameInput = document.createElement("input");
+    nameInput.type = "text";
+    nameInput.value = item.title;
+    nameInput.placeholder = "请输入名称";
+    contentText.appendChild(nameInput);
+
+    const textarea = document.createElement("textarea");
+    textarea.value = item.content;
+    contentText.appendChild(textarea);
+
+    const editControls = document.createElement("div");
+    editControls.className = "edit-controls";
+
+    const imgUrlInput = document.createElement("input");
+    imgUrlInput.type = "text";
+    imgUrlInput.value = item.image;
+    imgUrlInput.placeholder = "图片 URL 或留空使用上传图片";
+    editControls.appendChild(imgUrlInput);
+
+    const imgFileInput = document.createElement("input");
+    imgFileInput.type = "file";
+    imgFileInput.accept = "image/*";
+    imgFileInput.style.marginTop = "8px";
+    editControls.appendChild(imgFileInput);
+
+    imgFileInput.addEventListener("change", () => {
+      const file = imgFileInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          imgUrlInput.value = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    const saveBtn = document.createElement("button");
+    saveBtn.textContent = "💾 保存修改";
+    saveBtn.onclick = () => {
+      const newTitle = nameInput.value.trim() || "未命名";
+      const newContent = textarea.value;
+      const newImage = imgUrlInput.value.trim() || "https://via.placeholder.com/600x400?text=无图";
+
+      const data = loadData();
+      data[index].title = newTitle;
+      data[index].content = newContent;
+      data[index].image = newImage;
+      saveData(data);
+
+      alert("修改已保存！");
+
+      renderList(searchBox.value.trim());
+
+      const items = itemList.querySelectorAll(".item");
+      for(let el of items) {
+        if(el.textContent === newTitle) {
+          el.classList.add("active");
+          break;
+        }
+      }
+
+      contentImage.src = newImage;
+      contentImage.alt = newTitle;
+      nameInput.value = newTitle;
+    };
+    editControls.appendChild(saveBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.textContent = "🗑 删除";
+    delBtn.className = "delete";
+    delBtn.onclick = () => {
+      if(confirm(`确定要删除“${item.title}”吗？删除后不可恢复！`)) {
+        const data = loadData();
+        data.splice(index,1);
+        saveData(data);
+        alert("已删除！");
+        currentIndex = null;
+        renderList(searchBox.value.trim());
+        contentText.innerHTML = `<h2>欢迎</h2><p>请从左侧目录选择一项查看详情。</p>`;
+        contentImage.src = "";
+        contentImage.alt = "";
+      }
+    };
+    editControls.appendChild(delBtn);
+
+    contentText.appendChild(editControls);
+  }
+
+  function selectItem(index, element) {
+    currentIndex = index;
+    document.querySelectorAll(".item").forEach(el => el.classList.remove("active"));
+    element.classList.add("active");
+
+    if (loggedIn) {
+      showEdit(index);
+    } else {
+      showContent(index);
+    }
+  }
+
+  searchBox.addEventListener("input", e => {
+    renderList(e.target.value.trim());
+    const first = itemList.querySelector(".item");
+    if (first) {
+      first.click();
+    } else {
+      contentText.innerHTML = `<h2>无匹配内容</h2><p>请尝试其他关键词。</p>`;
+      contentImage.src = "";
+      contentImage.alt = "";
+    }
+  });
+
+  loginBtn.onclick = () => {
+    if (passwordInput.value === PASSWORD) {
+      loggedIn = true;
+      alert("登录成功！");
+      loginBox.style.display = "none";
+      addBtn.style.display = "block";
+      if (currentIndex !== null) {
+        showEdit(currentIndex);
+      }
+    } else {
+      alert("密码错误！");
+    }
+    passwordInput.value = "";
+  };
+
+  addBtn.onclick = () => {
+    newTitleInput.value = "";
+    newContentInput.value = "";
+    newImageFileInput.value = "";
+    addModal.style.display = "flex";
+  };
+
+  btnAddCancel.onclick = () => {
+    addModal.style.display = "none";
+  };
+
+  btnAddSave.onclick = () => {
+    const title = newTitleInput.value.trim() || "未命名";
+    const content = newContentInput.value.trim() || "";
+    const file = newImageFileInput.files[0];
+
+    if (!content) {
+      alert("内容不能为空！");
+      return;
+    }
+
+    function saveNewItem(imageData) {
+      const data = loadData();
+      data.push({
+        title,
+        content,
+        image: imageData || "https://via.placeholder.com/600x400?text=无图"
+      });
+      saveData(data);
+      addModal.style.display = "none";
+      renderList(searchBox.value.trim());
+
+      const items = itemList.querySelectorAll(".item");
+      let lastItem = null;
+      items.forEach(el => {
+        if (el.textContent === title) {
+          lastItem = el;
+        }
+      });
+      if (lastItem) {
+        lastItem.click();
+      }
+    }
+
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        saveNewItem(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      saveNewItem(null);
+    }
+  };
+
+  // 页面初始化
+  renderList();
+  const firstItem = itemList.querySelector(".item");
+  if (firstItem) firstItem.click();
+
+</script>
+</body>
+</html>
